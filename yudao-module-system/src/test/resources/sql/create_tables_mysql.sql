@@ -20,3 +20,21 @@ CREATE TABLE IF NOT EXISTS `system_dept` (
     `tenant_id` bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`)
 ) ENGINE = InnoDB COMMENT '部门表';
+
+CREATE TABLE IF NOT EXISTS `system_nav_link` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `name` varchar(50) NOT NULL,
+    `url` varchar(500) NOT NULL,
+    `category` tinyint NOT NULL,
+    `icon` varchar(100) DEFAULT '',
+    `sort` int NOT NULL DEFAULT 0,
+    `status` tinyint NOT NULL DEFAULT 0,
+    `remark` varchar(500) DEFAULT NULL,
+    `creator` varchar(64) DEFAULT '',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `deleted` bit(1) NOT NULL DEFAULT b'0',
+    `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`)
+) ENGINE = InnoDB COMMENT '常用网址导航表';
