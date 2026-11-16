@@ -1,0 +1,25 @@
+spring:
+  main:
+    lazy-initialization: true
+    banner-mode: off
+  datasource:
+    url: jdbc:h2:mem:book-test;MODE=MYSQL;DATABASE_TO_UPPER=false
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+    druid:
+      async-init: true
+      initial-size: 1
+  sql:
+    init:
+      schema-locations: classpath:/sql/create_tables.sql
+      encoding: UTF-8
+mybatis-plus:
+  lazy-initialization: true
+  type-aliases-package: cn.iocoder.yudao.module.book.dal.dataobject
+  global-config:
+    db-config:
+      id-type: AUTO
+yudao:
+  info:
+    base-package: cn.iocoder.yudao.module.book
