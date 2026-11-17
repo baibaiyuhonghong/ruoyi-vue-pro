@@ -12,6 +12,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -37,16 +38,23 @@ public class ExcelUtils {
      */
     public static <T> void write(HttpServletResponse response, String filename, String sheetName,
                                  Class<T> head, List<T> data) throws IOException {
+        write(response.getOutputStream(), sheetName, head, data);
+        // 设置 header 和 contentType。写在最后的原因是，避免报错时，响应 contentType 已经被修改了
+        response.addHeader("Content-Disposition", "attachment;filename=" + HttpUtils.encodeUtf8(filename));
+        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
+    }
+
+    /**
+     * 将列表写入调用方提供的输出流，调用方负责关闭流。
+     */
+    public static <T> void write(OutputStream outputStream, String sheetName, Class<T> head, List<T> data) {
         // 输出 Excel
-        FastExcelFactory.write(response.getOutputStream(), head)
+        FastExcelFactory.write(outputStream, head)
                 .autoCloseStream(false) // 不要自动关闭，交给 Servlet 自己处理
                 .registerWriteHandler(new ColumnWidthMatchStyleStrategy()) // 基于 column 长度，自动适配。最大 255 宽度
                 .registerWriteHandler(new SelectSheetWriteHandler(head)) // 基于固定 sheet 实现下拉框
                 .registerConverter(new LongStringConverter()) // 避免 Long 类型丢失精度
                 .sheet(sheetName).doWrite(data);
-        // 设置 header 和 contentType。写在最后的原因是，避免报错时，响应 contentType 已经被修改了
-        response.addHeader("Content-Disposition", "attachment;filename=" + HttpUtils.encodeUtf8(filename));
-        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
     }
 
     /**
