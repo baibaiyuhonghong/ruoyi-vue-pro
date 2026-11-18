@@ -16,6 +16,7 @@ import java.util.List;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
+import static cn.iocoder.yudao.module.book.enums.ErrorCodeConstants.BOOK_ISBN_DUPLICATE;
 import static cn.iocoder.yudao.module.book.enums.ErrorCodeConstants.BOOK_NOT_EXISTS;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -81,9 +82,9 @@ class BookServiceImplTest extends BaseDbUnitTest {
     @Test
     void testGetBookPage() {
         Long firstId = bookService.createBook(buildBook("红楼梦 上册", 0));
-        Long secondId = bookService.createBook(buildBook("红楼梦 下册", 0));
-        bookService.createBook(buildBook("红楼梦 纪念版", 1));
-        bookService.createBook(buildBook("石头记", 0));
+        Long secondId = bookService.createBook(buildBook("红楼梦 下册", 0).setIsbn("9787020002214"));
+        bookService.createBook(buildBook("红楼梦 纪念版", 1).setIsbn("9787020002221"));
+        bookService.createBook(buildBook("石头记", 0).setIsbn("9787020002238"));
 
         BookPageReqVO pageReqVO = new BookPageReqVO();
         pageReqVO.setName("红楼梦");
@@ -102,6 +103,28 @@ class BookServiceImplTest extends BaseDbUnitTest {
         pageReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
         page = bookService.getBookPage(pageReqVO);
         assertEquals(List.of(secondId, firstId), page.getList().stream().map(BookDO::getId).toList());
+    }
+
+    @Test
+    void testDuplicateIsbnOnCreate() {
+        BookSaveReqVO original = buildBook("红楼梦", 0);
+        Long id = bookService.createBook(original);
+        BookSaveReqVO duplicate = buildBook("另一本书", 0);
+        assertServiceException(() -> bookService.createBook(duplicate), BOOK_ISBN_DUPLICATE);
+        bookService.deleteBook(id);
+        assertServiceException(() -> bookService.createBook(duplicate), BOOK_ISBN_DUPLICATE);
+    }
+
+    @Test
+    void testDuplicateIsbnOnUpdate() {
+        BookSaveReqVO original = buildBook("红楼梦", 0);
+        bookService.createBook(original);
+        BookSaveReqVO other = buildBook("另一本书", 0).setIsbn("9787020002214");
+        Long id = bookService.createBook(other);
+        other.setId(id);
+        other.setIsbn(original.getIsbn());
+        assertServiceException(() -> bookService.updateBook(other), BOOK_ISBN_DUPLICATE);
+        assertEquals("9787020002214", bookService.getBook(id).getIsbn());
     }
 
     private BookSaveReqVO buildBook(String name, int status) {

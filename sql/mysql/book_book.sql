@@ -18,5 +18,6 @@ CREATE TABLE `book_book` (
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT 0 COMMENT '租户编号',
   PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_book_isbn` (`isbn`),
   KEY `idx_tenant_deleted_id` (`tenant_id`, `deleted`, `id`)
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '图书表';

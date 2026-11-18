@@ -14,5 +14,6 @@ CREATE TABLE IF NOT EXISTS "book_book" (
     "update_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deleted" bit NOT NULL DEFAULT FALSE,
     "tenant_id" bigint NOT NULL DEFAULT 0,
-    PRIMARY KEY ("id")
+    PRIMARY KEY ("id"),
+    UNIQUE ("isbn")
 );
