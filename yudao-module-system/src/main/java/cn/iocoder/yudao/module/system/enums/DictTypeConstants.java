@@ -25,4 +25,7 @@ public interface DictTypeConstants {
 
     String NAV_LINK_CATEGORY = "system_nav_link_category"; // 网址导航分类
 
+    String TODO_STATUS = "system_todo_status"; // 个人待办状态
+    String TODO_PRIORITY = "system_todo_priority"; // 个人待办优先级
+
 }

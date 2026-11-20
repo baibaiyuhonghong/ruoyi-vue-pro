@@ -173,4 +173,8 @@ public interface ErrorCodeConstants {
     // ========== 常用网址导航 1-002-029-000 ==========
     ErrorCode NAV_LINK_NOT_EXISTS = new ErrorCode(1_002_029_000, "常用网址导航不存在");
 
+    // ========== 个人待办 1-002-030-000 ==========
+    ErrorCode TODO_NOT_EXISTS = new ErrorCode(1_002_030_000, "待办不存在");
+    ErrorCode TODO_NOT_OWNER = new ErrorCode(1_002_030_001, "不能操作他人的待办");
+
 }

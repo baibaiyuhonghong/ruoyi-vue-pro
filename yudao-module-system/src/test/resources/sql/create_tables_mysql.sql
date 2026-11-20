@@ -38,3 +38,24 @@ CREATE TABLE IF NOT EXISTS `system_nav_link` (
     `tenant_id` bigint NOT NULL DEFAULT 0,
     PRIMARY KEY (`id`)
 ) ENGINE = InnoDB COMMENT '常用网址导航表';
+
+CREATE TABLE IF NOT EXISTS `system_todo` (
+    `id` bigint NOT NULL AUTO_INCREMENT,
+    `user_id` bigint NOT NULL,
+    `title` varchar(100) NOT NULL,
+    `content` varchar(1000) DEFAULT NULL,
+    `priority` tinyint NOT NULL DEFAULT 2,
+    `status` tinyint NOT NULL DEFAULT 0,
+    `deadline` datetime DEFAULT NULL,
+    `finish_time` datetime DEFAULT NULL,
+    `remark` varchar(500) DEFAULT NULL,
+    `creator` varchar(64) DEFAULT '',
+    `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updater` varchar(64) DEFAULT '',
+    `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    `deleted` bit(1) NOT NULL DEFAULT b'0',
+    `tenant_id` bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY (`id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_deadline` (`deadline`)
+) ENGINE = InnoDB COMMENT '个人待办表';
