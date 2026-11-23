@@ -8,6 +8,8 @@
 #    不建应用账号，后端以 root + 空密码连接；Redis 去掉 requirepass，后端不带密码连接。
 #    注意：MySQL 账号只在数据卷首次初始化时按环境变量生成，已有数据卷改这里不生效，
 #    切换无密码时需先 docker compose down -v 清掉 yudao-boot 的数据卷再重建。
+# 4) mysql 映射宿主机 3309（本机 3306 已被原生 MySQL 占用）：供 Navicat 直连新库；
+#    老 dev-mysql 同样占 3309，启用本映射前必须先停掉/删除老 dev-mysql 让出端口。
 services:
   web:
     image: yudao-web:local
@@ -15,6 +17,8 @@ services:
   mysql:
     volumes: !override
       - mysql-data:/var/lib/mysql
+    ports:
+      - "3309:3306"
     environment: !override
       TZ: Asia/Shanghai
       MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
