@@ -1,0 +1,13 @@
+# Jenkins 本地部署专用覆盖（与 docker-compose.yml 同目录，docker compose 会自动合并）
+# 1) web：改用 Jenkins 预先构建好的前端镜像 yudao-web（node 打包 + nginx 已在镜像内），
+#    不再 bind 挂载 ./web/dist 与 nginx 配置——Jenkins 在容器内通过 docker.sock 发起时，
+#    bind 路径会被宿主机 Docker 按错误位置解析。
+# 2) mysql：去掉初始化 SQL 的 bind 挂载（同一原因），只保留数据卷；
+#    首次初始化由 Jenkins 脚本通过 docker compose exec 导入 SQL。
+services:
+  web:
+    image: yudao-web:local
+    volumes: !override []
+  mysql:
+    volumes: !override
+      - mysql-data:/var/lib/mysql
