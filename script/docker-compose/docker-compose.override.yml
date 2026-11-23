@@ -15,6 +15,10 @@
 #    （external），数据原地不动；容器名保持 dev-* 不变。Nacos 老容器没挂卷、配置在容器层，
 #    已单独抢救进新卷 yudao-boot_nacos-data。Jenkins 放在 profile 后面：日常构建的
 #    docker compose up -d 不会碰它（防它把自己重建掉），切换/启动时用 --profile jenkins。
+# 6) 后端映射宿主机 48080（2026-11-23 用户要求两种模式都要）：全 Docker 模式走 nginx
+#    80 端口反代（本条不影响它）；WebStorm 本地 dev 前端走 .env.local 里写死的代理目标
+#    localhost:48080 直连后端。官方 compose 默认不映射 48080，dev 前端会吃 502/连接拒绝，
+#    加回本映射后两种模式可随时切换、互不影响。
 services:
   web:
     image: yudao-web:local
@@ -43,6 +47,8 @@ services:
       retries: 20
       start_period: 5s
   yudao-server:
+    ports:
+      - "48080:48080"
     environment:
       SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: root
       SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ""
