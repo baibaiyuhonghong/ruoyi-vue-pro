@@ -19,6 +19,10 @@
 #    80 端口反代（本条不影响它）；WebStorm 本地 dev 前端走 .env.local 里写死的代理目标
 #    localhost:48080 直连后端。官方 compose 默认不映射 48080，dev 前端会吃 502/连接拒绝，
 #    加回本映射后两种模式可随时切换、互不影响。
+# 7) PG 与 Nacos 改按需启动（2026-11-23 用户拍板，本机内存有限）：两者放进 profile
+#    「ondemand」后面，日常构建的 docker compose up -d 不再自动拉起，省内存；芋道本体
+#    不依赖它们。需要时在 Docker Desktop 里点对应容器的启动按钮即可；若容器已被删除，
+#    用 --profile ondemand 的一次性 compose 命令重建（方法同 Jenkins 那条）。
 services:
   web:
     image: yudao-web:local
@@ -81,6 +85,7 @@ services:
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
   nacos:
+    profiles: ["ondemand"]
     image: nacos/nacos-server:v2.5.4
     container_name: dev-nacos
     restart: unless-stopped
@@ -94,6 +99,7 @@ services:
     volumes:
       - nacos-data:/home/nacos/data
   pg:
+    profiles: ["ondemand"]
     image: postgres:19
     container_name: dev-pg
     restart: unless-stopped
