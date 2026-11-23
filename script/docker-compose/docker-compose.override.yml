@@ -4,6 +4,10 @@
 #    bind 路径会被宿主机 Docker 按错误位置解析。
 # 2) mysql：去掉初始化 SQL 的 bind 挂载（同一原因），只保留数据卷；
 #    首次初始化由 Jenkins 脚本通过 docker compose exec 导入 SQL。
+# 3) 本地无密码（2026-11-23 用户拍板，只在本机玩）：MySQL 允许 root 空密码初始化、
+#    不建应用账号，后端以 root + 空密码连接；Redis 去掉 requirepass，后端不带密码连接。
+#    注意：MySQL 账号只在数据卷首次初始化时按环境变量生成，已有数据卷改这里不生效，
+#    切换无密码时需先 docker compose down -v 清掉 yudao-boot 的数据卷再重建。
 services:
   web:
     image: yudao-web:local
@@ -11,3 +15,28 @@ services:
   mysql:
     volumes: !override
       - mysql-data:/var/lib/mysql
+    environment: !override
+      TZ: Asia/Shanghai
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-ruoyi-vue-pro}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+  redis:
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+  yudao-server:
+    environment:
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: root
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ""
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_USERNAME: root
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_PASSWORD: ""
+      SPRING_DATA_REDIS_PASSWORD: !reset null
