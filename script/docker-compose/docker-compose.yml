@@ -1,143 +1,114 @@
-# 芋道前后端 Docker Compose 编排（单体版）
-#
-# 目标：在一台已安装 Docker Engine + Docker Compose V2 的机器上，快速拉起
-#       MySQL、Redis、yudao-server（后端）与前端 Nginx，组成一套可登录的体验环境。
-#
-# 使用前必读：
-#   1. 需要 Docker Compose V2.20.2 及以上版本（使用 `docker compose` 命令，而非老的 `docker-compose`）。
-#   2. 需要先在源码根目录执行 `mvn clean package -pl yudao-server -am -Dmaven.test.skip=true`
-#      生成 yudao-server/target/yudao-server.jar，本文件 build 时会由 yudao-server/Dockerfile 复制该 Jar。
-#   3. 需要先把前端打包产物（dist 目录中的全部文件，包含 index.html）复制到 ./web/dist/。
-#      前端生产配置应使用同源地址（例如 http://localhost:8080 或部署域名），
-#      不要写 yudao-server、127.0.0.1:48080 等容器名或后端端口；API 路径为 /admin-api。
-#   4. 复制 .env.example 为 .env，并替换其中的示例密码后再启动。
-#
-# 常用命令（均在本目录执行）：
-#   docker compose config          # 校验并预览最终配置，变量缺失会直接报错
-#   docker compose up -d --build   # 构建后端镜像并启动全部服务
-#   docker compose logs -f yudao-server
-#   docker compose down            # 停止并删除容器（保留数据卷）
-#
-# 注意：不要执行 `docker compose down -v`，它会删除 MySQL、Redis 数据卷。
+# 芋道 Boot 单体版 Docker Compose 入门部署：yudao-server + 前端 Nginx + MySQL + Redis
+# 使用说明见同目录 README.md；需 Docker Compose V2.20.2 及以上（docker compose 命令）
+# 本文件中的相对路径，均相对于本文件所在目录，与执行命令时的当前目录无关
 
 name: yudao-boot
 
 services:
   mysql:
     image: mysql:8.4
-    container_name: yudao-boot-mysql
     restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
     environment:
       TZ: Asia/Shanghai
-      # 仅在数据卷为空、首次初始化时生效；启动后修改 .env 不会同步修改库内账号密码。
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-ruoyi-vue-pro}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?请在 .env 中设置 MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER:-yudao}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
-    # 默认不映射到宿主机，避免与本机已有的 3306 冲突；需要直连时取消下一行注释。
-    # ports:
-    #   - "3306:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      # 仅首次初始化（数据卷为空）时按文件名顺序执行；已有数据卷后修改 SQL 不会重复执行。
+      # 仅在 mysql-data 卷为空（首次启动）时，按文件名顺序执行；SQL 文件不存在时直接报错，避免被创建成空目录
       - type: bind
         source: ../../sql/mysql/ruoyi-vue-pro.sql
-        target: /docker-entrypoint-initdb.d/10-ruoyi-vue-pro.sql
+        target: /docker-entrypoint-initdb.d/01-ruoyi-vue-pro.sql
         read_only: true
         bind:
           create_host_path: false
       - type: bind
         source: ../../sql/mysql/quartz.sql
-        target: /docker-entrypoint-initdb.d/20-quartz.sql
+        target: /docker-entrypoint-initdb.d/02-quartz.sql
         read_only: true
         bind:
           create_host_path: false
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --default-time-zone=+08:00
+    # 默认不对宿主机开放；需要本机客户端连接时，取消注释（避免与本机已有 3306 冲突）
+    # ports:
+    #   - "127.0.0.1:13306:3306"
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
-      interval: 5s
-      timeout: 3s
+      # 首次初始化时 MySQL 临时实例不监听 TCP，因此 127.0.0.1 可连通即表示初始化完成
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
       retries: 30
-      start_period: 20s
+      start_period: 60s
 
   redis:
     image: redis:7.4-alpine
-    container_name: yudao-boot-redis
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}"]
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}
-    # 默认不映射到宿主机，避免与本机已有的 6379 冲突；需要直连时取消下一行注释。
-    # ports:
-    #   - "6379:6379"
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
     volumes:
       - redis-data:/data
-    # 通过环境变量把密码传给 redis-server，避免把真实密码直接写进编排文件。
-    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    # 默认不对宿主机开放；需要时取消注释（避免与本机已有 6379 冲突）
+    # ports:
+    #   - "127.0.0.1:16379:6379"
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 5s
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   yudao-server:
+    # 使用模块自带的 Dockerfile，需先在源码根目录执行 mvn 打包，生成 yudao-server/target/yudao-server.jar
     build:
       context: ../../yudao-server
-      dockerfile: Dockerfile
     image: yudao-server:${IMAGE_TAG:-local}
-    container_name: yudao-boot-server
     restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
+      # 数据库：主库、从库都要覆盖，否则会使用 application-${SPRING_PROFILES_ACTIVE}.yaml 中的 127.0.0.1
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ruoyi-vue-pro}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${MYSQL_USER:-yudao}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${MYSQL_PASSWORD}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ruoyi-vue-pro}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_USERNAME: ${MYSQL_USER:-yudao}
+      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_PASSWORD: ${MYSQL_PASSWORD}
+      # Redis：Spring Boot 4.x 使用 spring.data.redis.*
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # 需与前端打包时的 VITE_APP_CAPTCHA_ENABLE 一致
+      YUDAO_CAPTCHA_ENABLE: ${YUDAO_CAPTCHA_ENABLE:-true}
+      YUDAO_DEMO: "false"
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
-    environment:
-      TZ: Asia/Shanghai
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
-      JAVA_OPTS: ${JAVA_OPTS:--Xms512m -Xmx512m -Djava.security.egd=file:/dev/./urandom}
-      # 覆盖 application-dev.yaml 中的本地地址，使其指向同一 Compose 网络内的服务名。
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ruoyi-vue-pro}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME: ${MYSQL_USER:-yudao}
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-ruoyi-vue-pro}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_USERNAME: ${MYSQL_USER:-yudao}
-      SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_PASSWORD: ${MYSQL_PASSWORD:?请在 .env 中设置 MYSQL_PASSWORD}
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: "6379"
-      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}
-      YUDAO_CAPTCHA_ENABLE: ${YUDAO_CAPTCHA_ENABLE:-true}
-    # 默认不映射到宿主机，前端请求统一经 web（Nginx）反向代理；需要直调后端时取消注释。
+    # 默认只通过 web 的 Nginx 访问；需要直连后端排查时，取消注释
     # ports:
-    #   - "48080:48080"
+    #   - "127.0.0.1:48080:48080"
 
   web:
     image: nginx:1.28-alpine
-    container_name: yudao-boot-web
     restart: unless-stopped
-    depends_on:
-      - yudao-server
     ports:
       - "${WEB_PORT:-8080}:80"
     volumes:
+      # 前端打包产物（包含 index.html 的目录内容）复制到 ./web/dist
       - type: bind
         source: ./web/dist
         target: /usr/share/nginx/html
         read_only: true
         bind:
           create_host_path: false
-      - type: bind
-        source: ./nginx/default.conf
-        target: /etc/nginx/conf.d/default.conf
-        read_only: true
-        bind:
-          create_host_path: false
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - yudao-server
 
 volumes:
   mysql-data:
-    name: yudao-boot_mysql-data
   redis-data:
-    name: yudao-boot_redis-data

@@ -22,7 +22,7 @@ public class MoonshotChatModel implements ChatModel {
 
     public static final String COMPLETE_PATH = "/v1/chat/completions";
 
-    public static final String MODEL_DEFAULT = "kimi-k2.6";
+    public static final String MODEL_DEFAULT = "kimi-k3.1-pro";
 
     /**
      * 兼容 OpenAI 接口，复用 DeepSeek 客户端
@@ -42,13 +42,6 @@ public class MoonshotChatModel implements ChatModel {
     @Override
     public ChatOptions getOptions() {
         return deepSeekChatModel.getOptions();
-    }
-
-    @Override
-    @Deprecated(forRemoval = true)
-    @SuppressWarnings("removal")
-    public ChatOptions getDefaultOptions() {
-        return getOptions();
     }
 
 }
