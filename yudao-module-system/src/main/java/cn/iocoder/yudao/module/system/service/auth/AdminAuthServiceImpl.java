@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.system.service.auth;
 
+import cn.hutool.core.lang.Pair;
 import cn.hutool.core.util.ObjectUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
@@ -17,6 +18,7 @@ import cn.iocoder.yudao.module.system.controller.admin.auth.vo.*;
 import cn.iocoder.yudao.module.system.convert.auth.AuthConvert;
 import cn.iocoder.yudao.module.system.dal.dataobject.oauth2.OAuth2AccessTokenDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.enums.auth.AuthQrcodeStatusEnum;
 import cn.iocoder.yudao.module.system.enums.logger.LoginLogTypeEnum;
 import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
 import cn.iocoder.yudao.module.system.enums.oauth2.OAuth2ClientConstants;
@@ -33,7 +35,6 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Resource;
 import jakarta.validation.Validator;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,11 +51,12 @@ import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
  * @author 芋道源码
  */
 @Service
-@Slf4j
 public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Resource
     private AdminUserService userService;
+    @Resource
+    private AdminAuthQrcodeService authQrcodeService;
     @Resource
     private LoginLogService loginLogService;
     @Resource
@@ -107,10 +109,27 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         // 如果 socialType 非空，说明需要绑定社交用户
         if (reqVO.getSocialType() != null) {
             socialUserService.bindSocialUser(new SocialUserBindReqDTO(user.getId(), getUserType().getValue(),
-                    reqVO.getSocialType(), reqVO.getSocialCode(), reqVO.getSocialState()));
+                    reqVO.getSocialType(), reqVO.getSocialCode(), reqVO.getSocialState(), null));
         }
         // 创建 Token 令牌，记录登录日志
         return createTokenAfterLoginSuccess(user, reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+    }
+
+    @Override
+    @DataPermission(enable = false)
+    public AuthQrcodePollRespVO qrcodeLogin(AuthQrcodePollReqVO reqVO) {
+        Pair<AuthQrcodeStatusEnum, Long> result = authQrcodeService.pollAuthQrcode(reqVO);
+        AuthQrcodePollRespVO respVO = new AuthQrcodePollRespVO().setStatus(result.getKey().getStatus());
+        if (result.getKey() == AuthQrcodeStatusEnum.WAITING) {
+            return respVO;
+        }
+        // 已领取并删除二维码，登录失败或响应丢失时重新扫码。
+        AdminUserDO user = userService.getUser(result.getValue());
+        if (user == null) {
+            throw exception(USER_NOT_EXISTS);
+        }
+        // 创建 Token 令牌，记录登录日志
+        return respVO.setLogin(createTokenAfterLoginSuccess(user, user.getUsername(), LoginLogTypeEnum.LOGIN_QRCODE));
     }
 
     @Override
@@ -169,7 +188,7 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     public AuthLoginRespVO socialLogin(AuthSocialLoginReqVO reqVO) {
         // 使用 code 授权码，进行登录。然后，获得到绑定的用户编号
         SocialUserRespDTO socialUser = socialUserService.getSocialUserByCode(UserTypeEnum.ADMIN.getValue(), reqVO.getType(),
-                reqVO.getCode(), reqVO.getState());
+                reqVO.getCode(), reqVO.getState(), null);
         if (socialUser == null || socialUser.getUserId() == null) {
             throw exception(AUTH_THIRD_LOGIN_NOT_BIND);
         }
@@ -310,4 +329,5 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
         userService.updateUserPassword(userByMobile.getId(), reqVO.getPassword());
     }
+
 }

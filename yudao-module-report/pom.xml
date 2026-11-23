@@ -15,6 +15,7 @@
     <description>
         report 模块，主要实现数据可视化报表等功能。
         1. 基于「积木报表」实现，打印设计、报表设计、图形设计、大屏设计等。
+        2. 基于「UReport2」实现，中国式报表设计、预览、导出等。
     </description>
 
     <dependencies>
@@ -46,6 +47,10 @@
             <groupId>cn.iocoder.boot</groupId>
             <artifactId>yudao-spring-boot-starter-mybatis</artifactId>
         </dependency>
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-spring-boot-starter-redis</artifactId>
+        </dependency>
 
         <!-- Test 测试相关 -->
         <dependency>
@@ -53,14 +58,46 @@
             <artifactId>yudao-spring-boot-starter-test</artifactId>
         </dependency>
 
-        <!-- 积木报表-->
+        <!-- 积木报表：其 AI 功能（含 jimubi 大屏 AI）编译于 Spring AI 2.x 的 OpenAiChatModel / ChatClient，
+             排除积木自带的官方 Spring AI（org.springframework.ai），改用 yudao-dependencies 管理的 yudao-spring-ai（cn.iocoder.spring-ai） -->
         <dependency>
             <groupId>org.jeecgframework.jimureport</groupId>
             <artifactId>jimureport-spring-boot4-starter</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.jeecgframework.jimureport</groupId>
             <artifactId>jimubi-spring-boot4-starter</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.ai</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>cn.iocoder.spring-ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>cn.iocoder.spring-ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
+        </dependency>
+        <!-- OpenAI 官方 SDK 的 HTTP 客户端：okhttp 5.x 由 okhttp-bom 管理，JVM 实现在 okhttp-jvm 构件中 -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
+        </dependency>
+
+        <!-- UReport2 报表 -->
+        <dependency>
+            <groupId>cn.iocoder.ureport2</groupId>
+            <artifactId>ureport2-spring-boot-starter</artifactId>
         </dependency>
 
         <dependency>
