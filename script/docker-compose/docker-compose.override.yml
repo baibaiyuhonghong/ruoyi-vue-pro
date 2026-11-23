@@ -10,6 +10,11 @@
 #    切换无密码时需先 docker compose down -v 清掉 yudao-boot 的数据卷再重建。
 # 4) mysql 映射宿主机 3309（本机 3306 已被原生 MySQL 占用）：供 Navicat 直连新库；
 #    老 dev-mysql 同样占 3309，启用本映射前必须先停掉/删除老 dev-mysql 让出端口。
+# 5) 全栈合并（2026-11-23 用户拍板）：原 docker-env 的 MinIO、RabbitMQ、Nacos、
+#    PostgreSQL、Jenkins 全部并入本栈，旧栈退役。各服务直接认领 docker-env 的旧数据卷
+#    （external），数据原地不动；容器名保持 dev-* 不变。Nacos 老容器没挂卷、配置在容器层，
+#    已单独抢救进新卷 yudao-boot_nacos-data。Jenkins 放在 profile 后面：日常构建的
+#    docker compose up -d 不会碰它（防它把自己重建掉），切换/启动时用 --profile jenkins。
 services:
   web:
     image: yudao-web:local
@@ -44,3 +49,81 @@ services:
       SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_USERNAME: root
       SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_PASSWORD: ""
       SPRING_DATA_REDIS_PASSWORD: !reset null
+  minio:
+    image: elestio/minio:latest
+    container_name: dev-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: "12345678"
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: dev-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: "12345678"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+  nacos:
+    image: nacos/nacos-server:v2.5.4
+    container_name: dev-nacos
+    restart: unless-stopped
+    environment:
+      MODE: standalone
+      NACOS_AUTH_ENABLE: "false"
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+      - "9849:9849"
+    volumes:
+      - nacos-data:/home/nacos/data
+  pg:
+    image: postgres:19
+    container_name: dev-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      TZ: Asia/Tokyo
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql
+  jenkins:
+    profiles: ["jenkins"]
+    image: my-jenkins
+    container_name: dev-jenkins
+    restart: unless-stopped
+    user: root
+    environment:
+      TZ: Asia/Tokyo
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+volumes:
+  minio-data:
+    external: true
+    name: docker-env_minio_data
+  rabbitmq-data:
+    external: true
+    name: docker-env_rabbitmq_data
+  nacos-data:
+    name: yudao-boot_nacos-data
+  pg-data:
+    external: true
+    name: docker-env_pg_data
+  jenkins-home:
+    external: true
+    name: docker-env_jenkins_home
